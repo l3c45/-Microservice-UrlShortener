@@ -1,18 +1,22 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
 const app = express();
+const cors = require('cors');
 const bodyParser=require("body-parser")
-const dns = require('dns')
 const mongoose=require("mongoose")
 const validUrl=require("valid-url")
-var  nanoid  = require("nanoid");
+const  nanoid = require("nanoid");
+const port = process.env.PORT || 3000;
 
 
-const mySecret = process.env['PASS']
+//MIDDLEWARE
+app.use(bodyParser.urlencoded({ extended: false }))
+app.use(bodyParser.json())
+app.use(cors());
 
 
-mongoose.connect(mySecret, { useNewUrlParser: true, useUnifiedTopology: true });
+//DATABASE 
+mongoose.connect(process.env['PASS'], { useNewUrlParser: true, useUnifiedTopology: true });
 
 const UrlSchema = new mongoose.Schema({
   original_url:{
@@ -26,35 +30,26 @@ const UrlSchema = new mongoose.Schema({
 
 const Url = mongoose.model("Url", UrlSchema)
 
-const port = process.env.PORT || 3000;
-app.use(bodyParser.urlencoded({ extended: false }))
-app.use(bodyParser.json())
-app.use(cors());
-app.use('/public', express.static(`${process.cwd()}/public`));
-
-
-
-app.get('/', function(req, res) {
+//ROUTES
+app.get('/', (req, res) => {
    res.sendFile(process.cwd() + '/views/index.html');
 });
 
-// Your first API endpoint
-app.get('/api/hello', function(req, res) {
-  res.json({ greeting: 'hello API' });
-});
-
-
-app.get("/api/shorturl/:route", function(req,res){
+//Parametro route redirecciona a la url original
+app.get("/api/shorturl/:route",  async (req,res) => {
   let query=req.params.route
-  Url.findOne({short_url:query},async function(err,found){
-    console.log(found.original_url)
-    await res.redirect(found.original_url)
-  })
+
+  try{
+   const found=await Url.findOne({short_url:query})
+     res.redirect(found.original_url)
+  }catch(err) {
+    console.log(err);
+  }
 
 })
 
-
-app.post("/api/shorturl",async function(req,res){
+//Verifica si la URL es correcta , la almacena en DB asignandole un id aleatorio
+app.post("/api/shorturl",async (req,res) => {
 
   if (validUrl.isWebUri(req.body.url)){
       let id =nanoid(5)
@@ -72,11 +67,11 @@ app.post("/api/shorturl",async function(req,res){
     }
   
  }) 
+ 
+//STATIC 
+app.use('/public', express.static(`${process.cwd()}/public`));
 
-
-
-
-
+//PORT
 app.listen(port, function() {
   console.log(`Listening on port ${port}`);
 });
